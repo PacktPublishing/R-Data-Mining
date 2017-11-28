@@ -1,0 +1,17 @@
+field;explicative_field_name;description
+attr_3;corporation;boolean on the company being a corporation or partnership
+attr_4;subsidiary;boolean on the company pertaining to a group
+attr_5;previous default;boolean on the company experiencing previous defaults
+attr_6;customer agreement;boolean on the company having signed a standard supply agreement
+attr_7;multiple country;boolean on the company being our customer on more than one country
+attr_8;ROS;Return on sales
+attr_9;company revenues;company revenues, euro currency
+attr_10;Cost Income;return on sales
+attr_11;ROE;cost to income ratio
+attr_12;employees;number of employees
+attr_13;economic_sector;economic sector code
+default_numeric;default_numeric;boolean on the company being considered defaulted at year end
+default_flag;default_flag;boolean on the company being considered defaulted at year end
+customer_code;customer_code;"customer code, ""info customer"" system"
+commercial_portfolio;commercial_portfolio;"portfolio, ""marketing data"" system"
+business_unit;business_unit;"owner business unit, ""marketing data"" system"

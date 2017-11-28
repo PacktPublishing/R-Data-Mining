@@ -1,0 +1,188 @@
+---
+title: "middle east analyses"
+author: "Robert Mayer"
+date: "12/11/2017"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+options(scipen = 999)
+library(dplyr)
+library(ggplot2)
+library(tidytext)
+library(tidyr)
+library(igraph)
+library(ggraph)
+library(wordcloud)
+library(knitr)
+
+knitr::opts_chunk$set(echo = FALSE)
+load("data/corpus.rdata")
+
+corpus %>% 
+  filter(!grepl(c("date of foundation"),text)) %>% 
+  filter(!grepl(c( "industry"),text)) %>% 
+  filter(!grepl(c( "share holders"),text)) -> comments
+
+corpus %>% 
+  filter(grepl(("date of foundation+"),
+               text)|grepl(( "industry+"),
+                           text)|grepl(( "share holders+"),
+                                       text)) -> information
+
+```
+
+## activity objectives
+
+the report hereinafter shows result from the analyses performed with the aim of further investigage the drop in revenues during the first quarter of 2017
+
+## analysed data
+
+
+a sample of `r corpus$company %>% unique() %>% length()` companies was analysed, resorting to the customer cards produced from commercial department. In order to apply relevant text mining techniques described below a corpus of words was derived from those customer cards.
+
+the corpus was composed of `r corpus %>% unnest_tokens(word, text, token = "words") %>% select(word) %>% nchar() %>% as.numeric() %>% round(2)` words.
+
+## performed analyses
+
+Starting from described dataset the following techniques was applied:
+
+  - sentiment analysis, to discover the mood around the companies
+  - wordcloud to understand how this mood was determined
+  - ngram analysis needed to add context to most relevant words
+  - network analyses on shareholders to observe structures within the relationship among companies and relevant shareholders
+
+## results
+
+reproduced below are results from mentioned analyses.
+
+### sentiment analysis
+
+
+```{r}
+comments %>% 
+  unnest_tokens(word,text)-> comments_tidy
+
+#sentiment analysis  
+  
+lexicon <- get_sentiments("bing")
+
+comments_tidy %>% 
+  inner_join(lexicon) %>% 
+  count(company,  sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive -negative)-> comments_sentiment
+
+ggplot(comments_sentiment, aes(x = sentiment)) +
+  geom_histogram()
+```
+
+
+### wordcloud
+
+
+```{r}
+
+comments_tidy %>%
+  filter(!word %in% stop_words$word) %>%
+  count(word) %>%
+  with(wordcloud(word, n))
+```
+
+### ngram analysis
+
+#### bigrams
+
+```{r}
+comments %>% 
+unnest_tokens(bigram, text, token = "ngrams", n = 2) -> bigram_comments
+
+bigram_comments %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>% 
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  count(word1, word2, sort = TRUE) %>% 
+  head() %>% 
+  kable()
+```
+
+#### trigrams
+
+```{r}
+
+comments %>% 
+  unnest_tokens(trigram, text, token = "ngrams", n = 3) -> trigram_comments
+
+trigram_comments %>%
+  separate(trigram, c("word1", "word2","word3"), sep = " ") %>% 
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  filter(!word3 %in% stop_words$word) %>% 
+  count(word1, word2, word3, sort = TRUE) %>% 
+  kable()
+```
+
+### network analysis
+
+
+```{r}
+
+information %>% 
+  filter(grepl("share holders", text)) %>% 
+  mutate(shareholders = gsub("share holders: ","",text)) %>% 
+  separate(col = shareholders, into = c("first","second","third"),sep = ";") %>% 
+  gather(key = "number",value ="shareholder",-company,-text) %>% 
+  filter(!is.na(shareholder)) %>% 
+  select(company,shareholder)-> shareholders
+
+graph_from_data_frame(shareholders)-> graph_object
+
+#linking the size of a node to its degree
+ 
+
+ deg <- degree(graph_object, mode="all")
+ V(graph_object)$size <- deg*3
+ 
+ set.seed(30)
+ graph_object %>% 
+   ggraph() +
+   geom_edge_link(alpha = .2) +
+   geom_node_point(aes(size = size),alpha = .3) +
+   geom_node_text(aes(label = name,size = size), vjust = 1, hjust = 1, check_overlap = FALSE)+
+   theme_graph()
+
+```
+
+
+
+### data lineage
+
+```{r}
+
+information %>% 
+  filter(grepl("industry", text)) %>% 
+  mutate(industry = gsub("industry: ","",text))-> industries
+
+
+industries %>% 
+  inner_join(shareholders) %>% 
+  select(-text)->data_lineage_data
+
+inputPanel(
+  selectInput("selected_industry", label = "select the industry you want to focus on", selected = "",
+              choices = unique(data_lineage_data$industry)),
+  
+  textInput("name_string", label = "write the name of the shareholder",
+              value = "")
+)
+renderDataTable(
+ if (input$selected_industry != "" | input$name_string != ""){
+ data_lineage_data %>% 
+ filter(industry == input$selected_industry, grepl(input$name_string,shareholders))}else{(data_lineage_data)}
+)
+```
+
+
+
+
